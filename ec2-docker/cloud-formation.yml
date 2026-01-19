@@ -1,0 +1,119 @@
+name: MonoRepo - Deploy CloudFormation Stack
+
+permissions:
+  id-token: write
+  contents: read
+  
+on:
+  workflow_dispatch:
+    inputs:
+      stack_folder:
+        description: "Stack Folders"
+        required: true
+        type: choice
+        options:
+          - aws-tutorial
+          - ec2-docker
+
+      stack_name:
+        description: "Nome da CloudFormation Stack"
+        required: true
+        default: "study-stack"
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate CloudFormation template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://${{ github.event.inputs.stack_folder }}/template.yml
+
+      - name: Deploy stack
+        run: |
+          aws cloudformation deploy \
+            --stack-name ${{ github.event.inputs.stack_name }} \
+            --template-file ${{ github.event.inputs.stack_folder }}/template.yml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Login no ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag e push
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ec2-api-ecr-v2
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -f ec2-docker/Dockerfile -t $ECR_REPOSITORY:$IMAGE_TAG ec2-docker
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Obter InstanceId do stack
+        id: cf
+        run: |
+          INSTANCE_ID=$(aws cloudformation describe-stacks \
+            --stack-name ${{ github.event.inputs.stack_name }} \
+            --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" \
+            --output text)
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      - name: Deploy na EC2 via SSM (pull + restart)
+        env:
+          AWS_REGION: us-east-1
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ec2-api-ecr-v2
+          IMAGE_TAG: ${{ github.sha }}
+          INSTANCE_ID: ${{ steps.cf.outputs.instance_id }}
+        run: |
+          aws ssm send-command \
+            --region $AWS_REGION \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy container from ECR" \
+            --parameters commands="[
+              \"sudo yum update -y\",
+              \"sudo amazon-linux-extras install docker -y || true\",
+              \"sudo service docker start\",
+              \"sudo usermod -a -G docker ec2-user\",
+              \"aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY\",
+              \"sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
+              \"sudo docker stop ec2-api-ecr-v2 || true\",
+              \"sudo docker rm ec2-api-ecr-v2 || true\",
+              \"sudo docker run -d --restart unless-stopped --name ec2-api-ecr-v2 -p 8080:8080 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"
+            ]"
+
+      - name: Dump CloudFormation events on failure
+        if: failure()
+        run: |
+          echo "=== Stack status ==="
+          aws cloudformation describe-stacks \
+            --stack-name ${{ github.event.inputs.stack_name }} \
+            --query "Stacks[0].[StackStatus,StackStatusReason]" \
+            --output table || true
+
+          echo "=== Last stack events ==="
+          aws cloudformation describe-stack-events \
+            --stack-name ${{ github.event.inputs.stack_name }} \
+            --max-items 80 \
+            --query "StackEvents[].[Timestamp,ResourceStatus,LogicalResourceId,ResourceType,ResourceStatusReason]" \
+            --output table || true
