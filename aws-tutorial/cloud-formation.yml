@@ -1,0 +1,55 @@
+name: MonoRepo - Deploy CloudFormation Stack
+
+permissions:
+  id-token: write
+  contents: read
+  
+on:
+  workflow_dispatch:
+    inputs:
+      stack_folder:
+        description: "Stack Folders"
+        required: true
+        type: choice
+        options:
+          - aws-tutorial
+          - ec2-docker
+
+      stack_name:
+        description: "Nome da CloudFormation Stack"
+        required: true
+        default: "study-stack"
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate CloudFormation template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://${{ github.event.inputs.stack_folder }}/template.yml
+
+      - name: Deploy stack
+        run: |
+          aws cloudformation deploy \
+            --stack-name ${{ github.event.inputs.stack_name }} \
+            --template-file ${{ github.event.inputs.stack_folder }}/template.yml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset

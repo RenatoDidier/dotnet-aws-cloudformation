@@ -13,6 +13,7 @@ on:
         type: choice
         options:
           - aws-tutorial
+          - ec2-docker
 
       stack_name:
         description: "Nome da CloudFormation Stack"
@@ -52,3 +53,53 @@ jobs:
             --template-file ${{ github.event.inputs.stack_folder }}/template.yml \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset
+
+      - name: Login no ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag e push
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ec2-api-ecr
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Obter InstanceId do stack
+        id: cf
+        run: |
+          INSTANCE_ID=$(aws cloudformation describe-stacks \
+            --stack-name ${{ github.event.inputs.stack_name }} \
+            --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" \
+            --output text)
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      - name: Deploy na EC2 via SSM (pull + restart)
+        env:
+          AWS_REGION: us-east-1
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ec2-api-ecr
+          IMAGE_TAG: ${{ github.sha }}
+          INSTANCE_ID: ${{ steps.cf.outputs.instance_id }}
+        run: |
+          aws ssm send-command \
+            --region $AWS_REGION \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy container from ECR" \
+            --parameters commands="[
+              \"sudo yum update -y\",
+              \"sudo amazon-linux-extras install docker -y || true\",
+              \"sudo service docker start\",
+              \"sudo usermod -a -G docker ec2-user\",
+              \"aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY\",
+              \"sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
+              \"sudo docker stop ec2-api-ecr || true\",
+              \"sudo docker rm ec2-api-ecr || true\",
+              \"sudo docker run -d --restart unless-stopped --name ec2-api-ecr -p 8080:8080 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"
+            ]"
+
+

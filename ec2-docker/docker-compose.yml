@@ -1,0 +1,8 @@
+services:
+  api:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: ec2-api
+    ports:
+      - "8080:8080"
