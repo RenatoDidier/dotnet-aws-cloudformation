@@ -72,7 +72,7 @@ Resources:
   ApiRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: ec2-api-ecr
+      RepositoryName: ec2-api-ecr-v2
       ImageScanningConfiguration:
         ScanOnPush: true
 
