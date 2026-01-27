@@ -7,15 +7,22 @@ namespace Lambda;
 
 public class Function
 {
-    
-    /// <summary>
-    /// A simple function that takes a string and does a ToUpper
-    /// </summary>
-    /// <param name="input">The event for the Lambda function handler to process.</param>
-    /// <param name="context">The ILambdaContext that provides methods for logging and describing the Lambda environment.</param>
-    /// <returns></returns>
-    public string FunctionHandler(string input, ILambdaContext context)
+    public APIGatewayProxyResponse FunctionHandler(APIGatewayProxyRequest request, ILambdaContext context)
     {
-        return input.ToUpper();
+        var items = new[]
+        {
+            new { id = 1, name = "Lista Um" },
+            new { id = 2, name = "Lista Dois" },
+        };
+
+        return new APIGatewayProxyResponse
+        {
+            StatusCode = 200,
+            Headers = new Dictionary<string, string>
+            {
+                ["Content-Type"] = "application/json"
+            },
+            Body = JsonSerializer.Serialize(items)
+        };
     }
 }
