@@ -18,3 +18,61 @@ The stack creates:
 The infrastructure is deployed through **GitHub Actions using OIDC authentication**, with a workflow that validates and deploys the CloudFormation template on demand.
 
 This project is intended as an **introductory Infrastructure as Code (IaC) example**, focusing on EC2 provisioning and CI/CD integration with AWS.
+
+## 📁 lambda-sam
+
+This folder contains a **serverless application built with AWS SAM (Serverless Application Model)** using a **.NET Lambda function** exposed through **Amazon API Gateway**.
+
+The SAM template defines:
+
+- A **.NET 8 AWS Lambda function** with tracing and structured JSON logging enabled
+- An **API Gateway REST API** with a `GET /hello` endpoint mapped to the Lambda function
+- Global configuration for memory, timeout, and X-Ray tracing
+- Environment variables injected at runtime
+- **AWS Application Insights** automatically configured for monitoring and observability
+
+The project uses **AWS SAM abstractions** to simplify Lambda and API Gateway configuration while still deploying via CloudFormation under the hood.
+Commands:
+sam build
+sam deploy --guided
+
+This folder demonstrates a **serverless-first deployment model**, focusing on rapid development, observability, and minimal infrastructure management.
+
+## 📁 ec2-docker
+
+This folder contains an AWS infrastructure project that deploys a **.NET 10 API running inside a Docker container on Amazon EC2**.
+
+The CloudFormation stack provisions:
+
+- A dedicated **VPC** with a public subnet and internet gateway
+- An **EC2 instance** with Docker installed via User Data
+- An **ECR repository** to store Docker images
+- An **IAM role and instance profile** allowing the EC2 instance to pull images from ECR and be managed via AWS SSM
+- A **Security Group** exposing the API on port `8080`
+
+The GitHub Actions workflow:
+
+- Builds the .NET API Docker image
+- Pushes the image to **Amazon ECR**
+- Retrieves the EC2 instance ID from CloudFormation outputs
+- Deploys the container to EC2 using **AWS Systems Manager (SSM)** to pull, stop, and restart the Docker container remotely
+
+This project demonstrates a **container-based deployment model on EC2**, combining Infrastructure as Code with a CI/CD pipeline for image build and remote application deployment.
+
+## 📁 lambda
+
+This folder contains an AWS Lambda project deployed using **CloudFormation and GitHub Actions**, following a clear separation between **infrastructure provisioning** and **application deployment**.
+
+Because **AWS Lambda cannot be created without executable code**, the solution is split into two CloudFormation stacks:
+
+- A **base infrastructure stack** that provisions an **S3 bucket** to store Lambda artifacts
+- A **Lambda stack** that creates a **.NET 10 Lambda function** and an **HTTP API (API Gateway v2)**, referencing the artifact stored in S3
+
+The GitHub Actions workflow was intentionally designed to handle this constraint by:
+
+- Creating the S3 infrastructure stack first
+- Building and packaging the .NET Lambda application
+- Uploading the ZIP artifact to the S3 bucket
+- Deploying the Lambda stack with the S3 object key passed as a parameter
+
+This project demonstrates a **production-oriented Lambda deployment pattern**, highlighting how to work around the Lambda code requirement while keeping CloudFormation focused on infrastructure and the CI/CD pipeline responsible for application delivery.
