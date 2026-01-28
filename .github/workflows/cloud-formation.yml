@@ -53,6 +53,7 @@ jobs:
           dotnet publish lambda/Lambda.csproj \
             -c Release \
             -o lambda/publish
+            /p:PublishReadyToRun=false
 
       - name: Zip Lambda
         run: |
