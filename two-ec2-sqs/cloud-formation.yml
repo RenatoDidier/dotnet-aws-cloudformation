@@ -65,14 +65,14 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker-compose build
+          docker-compose -f two-ec2-sqs/docker-compose.yml build
 
       - name: Push imagens para o ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker-compose push
+          docker-compose -f two-ec2-sqs/docker-compose.yml push
 
       - name: Obter InstanceId do stack
         id: cf
