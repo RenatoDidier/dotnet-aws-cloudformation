@@ -94,6 +94,7 @@ jobs:
         env:
           AWS_REGION: us-east-1
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: publisher-api
           IMAGE_TAG: ${{ github.sha }}
           INSTANCE_ID: ${{ steps.cf.outputs.publisher_id }}
           SQS_URL: ${{ steps.cf.outputs.sqs_queue_url }} 
@@ -104,22 +105,22 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --comment "Deploy Publisher API" \
             --parameters commands="[
+              \"sudo yum update -y\",
+              \"sudo amazon-linux-extras install docker -y || true\",
+              \"sudo service docker start\",
+              \"sudo usermod -a -G docker ec2-user\",
               \"aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY\",
-              \"sudo docker pull $ECR_REGISTRY/publisher-api:$IMAGE_TAG\",
-              \"sudo docker stop publisher || true\",
-              \"sudo docker rm publisher || true\",
-              \"sudo docker run -d --restart unless-stopped \
-                --name publisher \
-                -p 8080:8080 \
-                -e AWS__Region=$AWS_REGION \
-                -e Sqs__QueueUrl=$SQS_URL \
-                $ECR_REGISTRY/publisher-api:$IMAGE_TAG\"
+              \"sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
+              \"sudo docker stop publisher-api || true\",
+              \"sudo docker rm publisher-api || true\",
+              \"sudo docker run -d --restart unless-stopped --name publisher-api -p 8080:8080 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"
             ]"
 
       - name: Deploy Consumer na EC2
         env:
           AWS_REGION: us-east-1
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: consumer-api
           IMAGE_TAG: ${{ github.sha }}
           INSTANCE_ID: ${{ steps.cf.outputs.consumer_id }}
           SQS_URL: ${{ steps.cf.outputs.sqs_queue_url }}
@@ -130,15 +131,15 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --comment "Deploy Consumer API" \
             --parameters commands="[
+              \"sudo yum update -y\",
+              \"sudo amazon-linux-extras install docker -y || true\",
+              \"sudo service docker start\",
+              \"sudo usermod -a -G docker ec2-user\",
               \"aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY\",
-              \"sudo docker pull $ECR_REGISTRY/consumer-api:$IMAGE_TAG\",
-              \"sudo docker stop consumer || true\",
-              \"sudo docker rm consumer || true\",
-              \"sudo docker run -d --restart unless-stopped \
-                --name consumer \
-                -e AWS__Region=$AWS_REGION \
-                -e Sqs__QueueUrl=$SQS_URL \
-                $ECR_REGISTRY/consumer-api:$IMAGE_TAG\"
+              \"sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
+              \"sudo docker stop consumer-api || true\",
+              \"sudo docker rm consumer-api || true\",
+              \"sudo docker run -d --restart unless-stopped --name consumer-api -p 8080:8080 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"
             ]"
 
       - name: Dump CloudFormation events on failure
