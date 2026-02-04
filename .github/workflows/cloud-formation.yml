@@ -113,7 +113,7 @@ jobs:
               \"sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
               \"sudo docker stop publisher-api || true\",
               \"sudo docker rm publisher-api || true\",
-              \"sudo docker run -d --restart unless-stopped --name publisher-api -p 8080:8080 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"
+              \"sudo docker run -d --restart unless-stopped --name publisher-api -p 8080:8080 -e Sqs__QueueUrl=$SQS_URL $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"
             ]"
 
       - name: Deploy Consumer na EC2
@@ -139,7 +139,7 @@ jobs:
               \"sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
               \"sudo docker stop consumer-api || true\",
               \"sudo docker rm consumer-api || true\",
-              \"sudo docker run -d --restart unless-stopped --name consumer-api -p 8080:8080 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"
+              \"sudo docker run -d --restart unless-stopped --name consumer-api -p 8080:8080 -e Sqs__QueueUrl=$SQS_URL $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"
             ]"
 
       - name: Dump CloudFormation events on failure

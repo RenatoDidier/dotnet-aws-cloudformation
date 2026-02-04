@@ -32,6 +32,7 @@ app.MapPost("/publish", async (PublishRequest payload, IAmazonSQS sqs) =>
     {
         QueueUrl = queueUrl,
         MessageBody = payload.Message,
+        MessageGroupId = "default",
         MessageAttributes = new Dictionary<string, MessageAttributeValue>
         {
             ["source"] = new MessageAttributeValue { DataType = "String", StringValue = "publisher-api" }
