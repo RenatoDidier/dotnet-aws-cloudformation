@@ -87,8 +87,14 @@ jobs:
             --query "Stacks[0].Outputs[?OutputKey=='ConsumerInstanceId'].OutputValue" \
             --output text)
 
+          SQS_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ github.event.inputs.stack_name }} \
+            --query "Stacks[0].Outputs[?OutputKey=='SqsQueueUrl'].OutputValue" \
+            --output text)
+
           echo "publisher_id=$PUBLISHER_ID" >> $GITHUB_OUTPUT
           echo "consumer_id=$CONSUMER_ID" >> $GITHUB_OUTPUT
+          echo "sqs_url=$SQS_URL" >> $GITHUB_OUTPUT
 
       - name: Deploy Publisher na EC2
         env:
