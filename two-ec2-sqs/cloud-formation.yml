@@ -103,7 +103,7 @@ jobs:
           ECR_REPOSITORY: publisher-api
           IMAGE_TAG: ${{ github.sha }}
           INSTANCE_ID: ${{ steps.cf.outputs.publisher_id }}
-          SQS_URL: ${{ steps.cf.outputs.sqs_queue_url }} 
+          SQS_URL: ${{ steps.cf.outputs.sqs_url }} 
         run: |
           aws ssm send-command \
             --region $AWS_REGION \
@@ -129,7 +129,7 @@ jobs:
           ECR_REPOSITORY: consumer-api
           IMAGE_TAG: ${{ github.sha }}
           INSTANCE_ID: ${{ steps.cf.outputs.consumer_id }}
-          SQS_URL: ${{ steps.cf.outputs.sqs_queue_url }}
+          SQS_URL: ${{ steps.cf.outputs.sqs_url }}
         run: |
           aws ssm send-command \
             --region $AWS_REGION \
