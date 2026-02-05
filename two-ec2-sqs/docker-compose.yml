@@ -1,0 +1,20 @@
+services:
+  api-publisher:
+    image: ${ECR_REGISTRY}/publisher-api:${IMAGE_TAG}
+    build:
+      context: ./PublisherApi
+      dockerfile: Dockerfile
+    container_name: ec2-publisher-api
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+
+  api-consumer:
+    image: ${ECR_REGISTRY}/consumer-api:${IMAGE_TAG}
+    build:
+      context: ./ConsumerApi
+      dockerfile: Dockerfile
+    container_name: ec2-consumer-api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
